@@ -188,13 +188,16 @@ document.querySelector('.search-container__form').addEventListener('submit', fun
     fetch(url)
         .then(response => {
             if (!response.ok) {
-                const cityNotFound = document.querySelector('.search-container__input-wrapper p')
-                cityNotFound.textContent = 'Город не найден'
                 throw new Error('Ошибка запроса');
             }
             return response.json();
         })
         .then(data => {
+            if (data.length === 0) {
+                const cityNotFound = document.querySelector('.search-container__input-wrapper p');
+                cityNotFound.textContent = 'Город не найден';
+                return;
+            }
             const list = document.querySelector('.search-container__weather-list');
             list.innerHTML = '';
             data.forEach(city => {
