@@ -1,122 +1,101 @@
-const apiKey = '0a376f898eaec5225d4188c8460ce497'
-let city = 'Moscow';
-const coord = {
-    "lon": 37.6156,
-    "lat": 55.7522
-};
-const MMHG_PER_HPA = 0.75006;
+class WeatherApi {
+    constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.baseUrl = 'https://api.openweathermap.org/data/2.5';
+    }
 
-function windDirection(deg) {
-    const DIRECTION_COUNT = 8;
-    const ANGLE_PER_DIRECTION = 360 / DIRECTION_COUNT;
-    const directions = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
-    const index = Math.round(deg / ANGLE_PER_DIRECTION) % DIRECTION_COUNT;
-    return directions[index];
-}
+    async getWeatherByCity(city) {
+        const url = `${this.baseUrl}/weather?q=${encodeURIComponent(city)}&appid=${this.apiKey}&units=metric&lang=ru`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Ошибка: ${res.status}`);
+        return await res.json();
+    }
 
-function formatVisibility(visibility) {
-    if (visibility >= 1000) {
-        return (visibility / 1000).toFixed(1) + ' км';
-    } else {
-        return visibility + ' м';
+    async getForecast(lat, lon) {
+        const url = `${this.baseUrl}/forecast?lat=${lat}&lon=${lon}&appid=${this.apiKey}&units=metric&lang=ru`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Ошибка прогноза: ${res.status}`);
+        return await res.json();
+    }
+
+    async getCityCoordinates(city) {
+        const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=4&appid=${this.apiKey}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Ошибка получения координат');
+        return await res.json();
     }
 }
 
-function formatWeatherDate(dt, mode = 'full') {
-    const localTime = new Date(dt * 1000);
-    const fullOptions = {
-        day: 'numeric',
-        month: 'long',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    };
-    const timeOnlyOptions = {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    };
-    const options = mode === 'time' ? timeOnlyOptions : fullOptions;
-    return localTime.toLocaleString('ru-RU', options);
+const apiKey = '0a376f898eaec5225d4188c8460ce497';
+let currentCity = 'Moscow';
+const coord = { lat: 55.7522, lon: 37.6156 };
+const MMHG_PER_HPA = 0.75006;
+const weatherApi = new WeatherApi(apiKey);
+
+async function getWeather() {
+    try {
+        document.querySelector('.loading').textContent = 'Загрузка...';
+        document.querySelector('.weather').style.visibility = 'hidden';
+
+        const data = await weatherApi.getWeatherByCity(currentCity);
+        coord.lat = data.coord.lat;
+        coord.lon = data.coord.lon;
+
+        renderCurrentWeather(data);
+        document.querySelector('.loading').textContent = '';
+        document.querySelector('.weather').style.visibility = 'visible';
+
+        await getForecast();
+    } catch (err) {
+        document.querySelector('.loading').textContent = 'Ошибка загрузки';
+        console.error(err);
+    }
 }
 
-function capitalize(str) {
-    if (!str) return '';
-    return str.charAt(0).toUpperCase() + str.slice(1);
+async function getForecast() {
+    try {
+        const forecastData = await weatherApi.getForecast(coord.lat, coord.lon);
+        const grouped = groupForecastByDay(forecastData.list);
+        renderForecastDays(grouped);
+    } catch (err) {
+        console.error('Ошибка прогноза:', err);
+    }
 }
 
-const getWeather = () => {
-    document.querySelector('.weather').style.visibility = 'hidden';
-    document.querySelector('.loading').textContent = 'Загрузка...'
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=ru`;
-    fetch(url)
-        .then(response => {
-            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            document.querySelector('.loading').textContent = ''
-            document.querySelector('.weather').style.visibility = 'visible';
-            document.querySelector('.weather__city').textContent = data.name
-            document.querySelector('.weather__temperature').textContent = data.main.temp + '°C'
-            document.querySelector('.weather__desc').textContent = capitalize(data.weather[0]['description'])
-            document.querySelector('.weather__icon').src = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`
-            document.querySelector('.weather__clouds').textContent = 'Облачность: ' + data.clouds.all + '%'
-            document.querySelector('.weather__feels-like').textContent = 'Ощущается как ' + data.main.feels_like + '°C'
-            document.querySelector('.weather__humidity').textContent = 'Влажность: ' + data.main.humidity + '%'
-            document.querySelector('.weather__pressure').textContent = 'Давление: ' + Math.round(data.main.pressure * MMHG_PER_HPA) + ' мм. рт. ст'
-            document.querySelector('.weather__wind-speed').textContent = `Ветер: ${data.wind.speed} м/с, ${windDirection(data.wind.deg)}`
-            document.querySelector('.weather__visibility').textContent = 'Видимость: ' + formatVisibility(data.visibility)
-            document.querySelector('.weather__date').textContent = formatWeatherDate(data.dt)
-            document.querySelector('.weather__date-sunrise').textContent = 'Восход: ' + formatWeatherDate(data.sys.sunrise, 'time')
-            document.querySelector('.weather__date-sunset').textContent = 'Закат: ' + formatWeatherDate(data.sys.sunset, 'time')
-            coord.lat = data.coord.lat
-            coord.lon = data.coord.lon
-            getWeatherForAnotherDays()
-            return data
-        })
-        .catch(error => {
-            console.error('Ошибка при запросе к OpenWeatherMap:', error);
-            return error
-        })
-        .then(data => {
-            return data
-        })
-}
-
-const getWeatherForAnotherDays = () => {
-    const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${coord.lat}&lon=${coord.lon}&units=metric&lang=ru&appid=${apiKey}`;
-    fetch(url)
-        .then(response => {
-            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            const days = {};
-            data.list.forEach(item => {
-                const date = new Date(item.dt * 1000);
-                const day = date.toLocaleDateString('ru-RU', {weekday: 'short', day: 'numeric', month: 'short'});
-                if (!days[day]) days[day] = [];
-                days[day].push(item);
-            });
-            renderForecastDays(days);
-        })
-        .catch(error => {
-            console.error('Ошибка при запросе прогноза:', error);
-        });
+function renderCurrentWeather(data) {
+    if (data.name) {
+        document.querySelector('.weather__city').textContent = data.name;
+    }
+    document.querySelector('.weather__temperature').textContent = data.main.temp.toFixed(1) + '°C';
+    document.querySelector('.weather__desc').textContent = capitalize(data.weather[0].description);
+    document.querySelector('.weather__icon').src = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
+    document.querySelector('.weather__clouds').textContent = 'Облачность: ' + data.clouds.all + '%';
+    document.querySelector('.weather__feels-like').textContent = 'Ощущается как ' + data.main.feels_like.toFixed(1) + '°C';
+    document.querySelector('.weather__humidity').textContent = 'Влажность: ' + data.main.humidity + '%';
+    document.querySelector('.weather__pressure').textContent = 'Давление: ' + Math.round(data.main.pressure * MMHG_PER_HPA) + ' мм. рт. ст';
+    document.querySelector('.weather__wind-speed').textContent = `Ветер: ${data.wind.speed} м/с, ${windDirection(data.wind.deg)}`;
+    document.querySelector('.weather__visibility').textContent = 'Видимость: ' + formatVisibility(data.visibility);
+    document.querySelector('.weather__date').textContent = formatWeatherDate(data.dt);
+    if (data.sys) {
+        document.querySelector('.weather__date-sunrise').textContent = 'Восход: ' + formatWeatherDate(data.sys.sunrise, 'time');
+        document.querySelector('.weather__date-sunset').textContent = 'Закат: ' + formatWeatherDate(data.sys.sunset, 'time');
+    } else {
+        document.querySelector('.weather__date-sunrise').textContent = '';
+        document.querySelector('.weather__date-sunset').textContent = '';
+    }
 }
 
 function renderForecastDays(days) {
-    const forecastDaysContainer = document.querySelector('.forecast__days');
-    const forecastDetailsContainer = document.querySelector('.forecast__details');
-    forecastDaysContainer.innerHTML = '';
-    forecastDetailsContainer.innerHTML = '';
+    const container = document.querySelector('.forecast__days');
+    const details = document.querySelector('.forecast__details');
+    container.innerHTML = '';
+    details.innerHTML = '';
 
     Object.keys(days).forEach((dayLabel, index) => {
         const btn = document.createElement('button');
         btn.className = 'forecast__day-btn';
         btn.textContent = dayLabel;
-        if (index === 0) btn.classList.add('active'); // делаем первый активным по умолчанию
+        if (index === 0) btn.classList.add('active');
 
         btn.addEventListener('click', () => {
             document.querySelectorAll('.forecast__day-btn').forEach(b => b.classList.remove('active'));
@@ -124,12 +103,10 @@ function renderForecastDays(days) {
             renderForecastDetails(days[dayLabel]);
         });
 
-        forecastDaysContainer.appendChild(btn);
+        container.appendChild(btn);
     });
 
-    // Сразу отрисуем первый день
-    const firstDay = Object.keys(days)[0];
-    renderForecastDetails(days[firstDay]);
+    renderForecastDetails(days[Object.keys(days)[0]]);
 }
 
 function renderForecastDetails(items) {
@@ -152,102 +129,105 @@ function renderForecastDetails(items) {
              <div>${item.weather[0].description}</div>
          `;
         container.appendChild(li);
+
         li.addEventListener('click', () => {
-            const allItems = Array.from(container.children);
-            const index = allItems.indexOf(li);
-            document.querySelector('.weather__clouds').textContent = 'Облачность: ' + items[index].clouds.all + '%'
-            document.querySelector('.weather__date').textContent = formatWeatherDate(items[index].dt)
-            document.querySelector('.weather__feels-like').textContent = 'Ощущается как ' + items[index].main.feels_like + '°C'
-            document.querySelector('.weather__humidity').textContent = 'Влажность: ' + items[index].main.humidity + '%'
-            document.querySelector('.weather__pressure').textContent = 'Давление: ' + Math.round(items[index].main.pressure * MMHG_PER_HPA) + ' мм. рт. ст'
-            document.querySelector('.weather__temperature').textContent = items[index].main.temp + '°C'
-            document.querySelector('.weather__visibility').textContent = 'Видимость: ' + formatVisibility(items[index].visibility)
-            document.querySelector('.weather__desc').textContent = capitalize(items[index].weather[0]['description'])
-            document.querySelector('.weather__wind-speed').textContent = `Ветер: ${items[index].wind.speed} м/с, ${windDirection(items[index].wind.deg)}`
-            document.querySelector('.weather__icon').src = `https://openweathermap.org/img/wn/${items[index].weather[0].icon}@2x.png`
-            document.querySelector('.weather__date-sunrise').textContent = ''
-            document.querySelector('.weather__date-sunset').textContent = ''
-        })
+            renderCurrentWeather({
+                main: item.main,
+                weather: item.weather,
+                wind: item.wind,
+                clouds: item.clouds,
+                visibility: item.visibility,
+                dt: item.dt
+            });
+        });
     });
 }
 
-getWeather()
+function groupForecastByDay(list) {
+    const days = {};
+    list.forEach(item => {
+        const date = new Date(item.dt * 1000);
+        const day = date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (!days[day]) days[day] = [];
+        days[day].push(item);
+    });
+    return days;
+}
 
-document.querySelector('.search-container__form').addEventListener('submit', function (e) {
+// Поиск города
+document.querySelector('.search-container__form').addEventListener('submit', async function (e) {
     e.preventDefault();
-    city = document.querySelector('.search-container__input').value.trim();
-    const cityNotFound = document.querySelector('.search-container__input-wrapper p')
+    const input = document.querySelector('.search-container__input');
+    const city = input.value.trim();
+    const warning = document.querySelector('.search-container__input-wrapper p');
 
-    // Проверка, если поле ввода пустое
     if (!city) {
-        cityNotFound.textContent = 'Введите название города';
+        warning.textContent = 'Введите название города';
         return;
     }
-    cityNotFound.textContent = ''
-    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=4&appid=${apiKey}`;
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Ошибка запроса');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.length === 0) {
-                const cityNotFound = document.querySelector('.search-container__input-wrapper p');
-                cityNotFound.textContent = 'Город не найден';
-                return;
-            }
-            const list = document.querySelector('.search-container__weather-list');
-            list.innerHTML = '';
-            data.forEach(city => {
-                const li = document.createElement('li');
 
-                // Изображение флага страны
-                const flag = document.createElement('img');
-                flag.src = `https://openweathermap.org/images/flags/${city.country.toLowerCase()}.png`;
-                flag.alt = city.country;
-                flag.style.width = '24px';
-                flag.style.height = '16px';
+    try {
+        const cities = await weatherApi.getCityCoordinates(city);
+        if (cities.length === 0) {
+            warning.textContent = 'Город не найден';
+            return;
+        }
 
-                // Текст названия города
-                const cityName = document.createElement('span');
-                cityName.textContent = city.name;
-                li.appendChild(flag);
-                li.appendChild(cityName);
-                list.appendChild(li);
-                list.style.display = 'block';
-            });
-
-            // Кликаем по городу в поиске
-            const items = document.querySelectorAll('.search-container__weather-list li');
-            items.forEach((item, index) => {
-                item.addEventListener('click', () => {
-                    list.innerHTML = '';
-                    list.style.display = 'none';
-                    document.querySelector('.forecast__days').innerHTML = '';
-                    document.querySelector('.forecast__details').innerHTML = '';
-                    getWeather()
-                });
-            });
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-        });
+        renderCityList(cities);
+    } catch (err) {
+        warning.textContent = 'Ошибка при поиске';
+        console.error(err);
+    }
 });
 
+function renderCityList(cities) {
+    const list = document.querySelector('.search-container__weather-list');
+    list.innerHTML = '';
+    list.style.display = 'block';
+
+    cities.forEach(city => {
+        const li = document.createElement('li');
+
+        const flag = document.createElement('img');
+        flag.src = `https://openweathermap.org/images/flags/${city.country.toLowerCase()}.png`;
+        flag.alt = city.country;
+        flag.style.width = '24px';
+        flag.style.height = '16px';
+
+        const name = document.createElement('span');
+        name.textContent = city.name;
+
+        li.appendChild(flag);
+        li.appendChild(name);
+        li.addEventListener('click', async () => {
+            currentCity = city.name;
+            list.innerHTML = '';
+            list.style.display = 'none';
+            document.querySelector('.forecast__days').innerHTML = '';
+            document.querySelector('.forecast__details').innerHTML = '';
+            await getWeather();
+        });
+
+        list.appendChild(li);
+    });
+}
+
+// Крестик очистки
 const input = document.querySelector('.search-container__input');
 const clearBtn = document.querySelector('.search-container__clear-btn');
+const cityWarning = document.querySelector('.search-container__input-wrapper p');
 
-// Показываем или скрываем крестик
 input.addEventListener('input', () => {
     clearBtn.style.display = input.value ? 'flex' : 'none';
+    cityWarning.textContent = '';
 });
 
-// Очистка поля при клике
 clearBtn.addEventListener('click', () => {
     input.value = '';
     clearBtn.style.display = 'none';
-    input.focus();
     document.querySelector('.search-container__weather-list').style.display = 'none';
+    cityWarning.textContent = '';
+    input.focus();
 });
+
+getWeather();
