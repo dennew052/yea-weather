@@ -1,4 +1,6 @@
-function windDirection(deg) {
+export const MMHG_PER_HPA = 0.75006;
+
+export function windDirection(deg) {
     const DIRECTION_COUNT = 8;
     const ANGLE_PER_DIRECTION = 360 / DIRECTION_COUNT;
     const directions = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
@@ -6,7 +8,7 @@ function windDirection(deg) {
     return directions[index];
 }
 
-function formatVisibility(visibility) {
+export function formatVisibility(visibility) {
     if (visibility >= 1000) {
         return (visibility / 1000).toFixed(1) + ' км';
     } else {
@@ -14,7 +16,7 @@ function formatVisibility(visibility) {
     }
 }
 
-function formatWeatherDate(dt, mode = 'full') {
+export function formatWeatherDate(dt, mode = 'full') {
     const localTime = new Date(dt * 1000);
     const fullOptions = {
         day: 'numeric',
@@ -32,7 +34,7 @@ function formatWeatherDate(dt, mode = 'full') {
     return localTime.toLocaleString('ru-RU', options);
 }
 
-function capitalize(str) {
+export function capitalize(str) {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
 }

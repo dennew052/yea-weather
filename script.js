@@ -1,53 +1,29 @@
-class WeatherApi {
-    constructor(apiKey) {
-        this.apiKey = apiKey;
-        this.baseUrl = 'https://api.openweathermap.org/data/2.5';
-    }
-
-    async getWeatherByCity(city) {
-        const url = `${this.baseUrl}/weather?q=${encodeURIComponent(city)}&appid=${this.apiKey}&units=metric&lang=ru`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Ошибка: ${res.status}`);
-        return await res.json();
-    }
-
-    async getForecast(lat, lon) {
-        const url = `${this.baseUrl}/forecast?lat=${lat}&lon=${lon}&appid=${this.apiKey}&units=metric&lang=ru`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Ошибка прогноза: ${res.status}`);
-        return await res.json();
-    }
-
-    async getCityCoordinates(city) {
-        const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=4&appid=${this.apiKey}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Ошибка получения координат');
-        return await res.json();
-    }
-}
+import { MMHG_PER_HPA, windDirection, formatVisibility, formatWeatherDate, capitalize } from './helpers.js';
+import { WeatherApi } from './services/WeatherApi.js';
 
 const apiKey = '0a376f898eaec5225d4188c8460ce497';
 let currentCity = 'Moscow';
 const coord = { lat: 55.7522, lon: 37.6156 };
-const MMHG_PER_HPA = 0.75006;
 const weatherApi = new WeatherApi(apiKey);
 
 async function getWeather() {
+    const loading = document.querySelector('.loading')
+    const weather = document.querySelector('.weather')
     try {
-        document.querySelector('.loading').textContent = 'Загрузка...';
-        document.querySelector('.weather').style.visibility = 'hidden';
+        loading.textContent = 'Загрузка...';
+        weather.style.visibility = 'hidden';
 
         const data = await weatherApi.getWeatherByCity(currentCity);
         coord.lat = data.coord.lat;
         coord.lon = data.coord.lon;
 
         renderCurrentWeather(data);
-        document.querySelector('.loading').textContent = '';
-        document.querySelector('.weather').style.visibility = 'visible';
+        loading.textContent = '';
+        weather.style.visibility = 'visible';
 
         await getForecast();
     } catch (err) {
-        document.querySelector('.loading').textContent = 'Ошибка загрузки';
+        loading.textContent = 'Ошибка загрузки';
         console.error(err);
     }
 }
@@ -173,6 +149,7 @@ document.querySelector('.search-container__form').addEventListener('submit', asy
             return;
         }
 
+        warning.textContent = '';
         renderCityList(cities);
     } catch (err) {
         warning.textContent = 'Ошибка при поиске';
