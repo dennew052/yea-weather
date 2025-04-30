@@ -187,8 +187,8 @@ function renderCityList(cities) {
 
     cities.forEach(city => {
         const li = document.createElement('li');
-
         const flag = document.createElement('img');
+
         flag.src = `https://openweathermap.org/images/flags/${city.country.toLowerCase()}.png`;
         flag.alt = city.country;
         flag.style.width = '24px';
