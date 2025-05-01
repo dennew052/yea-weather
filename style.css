@@ -191,6 +191,10 @@ body {
     cursor: pointer;
 }
 
+.forecast__day-btn:hover {
+    background-color: #ddd;
+}
+
 .forecast__day-btn.active {
     background-color: #3498db;
     color: #fff;
@@ -210,6 +214,12 @@ body {
     background-color: #f3f3f3;
     text-align: center;
     width: 120px;
+    transition: transform 0.1s ease;
+}
+
+.forecast__item:hover {
+    background-color: #e9e9e9;
+    transform: translateY(-5px) scale(1.005);
 }
 
 .forecast__item img {
