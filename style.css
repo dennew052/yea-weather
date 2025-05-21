@@ -118,7 +118,9 @@ body {
 }
 
 .weather__block1 {
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .weather__block2 {
